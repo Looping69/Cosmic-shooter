@@ -101,9 +101,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // WebSocket server (e.g. when the frontend is deployed to Vercel but the
     // game server runs on Railway/Render/Fly.io).
     // Falls back to same-host connection for local development.
-    const wsUrl = import.meta.env.VITE_WS_URL
-      ? import.meta.env.VITE_WS_URL
-      : (() => {
+    const wsUrl = import.meta.env.VITE_WS_URL || (() => {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           return `${protocol}//${window.location.host}`;
         })();

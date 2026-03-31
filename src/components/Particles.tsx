@@ -352,14 +352,13 @@ export function Particles({ mousePosRef, playerPosRef }: { mousePosRef: React.Mu
   });
 
   return (
-    <instancedMesh ref={meshRef} key={maxParticles} args={[undefined, undefined, maxParticles]} frustumCulled={false}>
+    <instancedMesh ref={meshRef} key={maxParticles} args={[undefined, undefined, maxParticles]}>
       <sphereGeometry args={[1, 16, 16]} />
       <meshBasicMaterial 
         map={particleTexture}
         transparent 
         opacity={1}
         blending={THREE.AdditiveBlending}
-        depthTest={false}
         depthWrite={false}
         toneMapped={false}
       />

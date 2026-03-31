@@ -1,0 +1,17 @@
+{
+  "name": "cosmic-shooter-backend",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "encore run",
+    "build": "encore build docker cosmic-shooter-backend:latest"
+  },
+  "dependencies": {
+    "encore.dev": "^1.56.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "~5.8.2"
+  }
+}

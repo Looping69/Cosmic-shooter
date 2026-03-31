@@ -36,6 +36,61 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Deployment
+
+The project has two parts: a static **frontend** (React/Vite) and a persistent **WebSocket game server** (Express + `ws`). They can be hosted separately.
+
+### Frontend — Vercel (or any static host)
+
+1. Deploy this repository to [Vercel](https://vercel.com). The included `vercel.json` handles SPA routing automatically.
+2. In your Vercel project settings → **Environment Variables**, add:
+   ```
+   VITE_WS_URL = wss://<your-game-server-domain>
+   ```
+3. Redeploy so the frontend is built with the new variable.
+
+### Game Server — Encore (recommended)
+
+[Encore](https://encore.dev) is a TypeScript backend framework with built-in WebSocket streaming support, automatic provisioning, and one-command cloud deployment. The `encore-backend/` folder in this repo is a ready-to-deploy Encore app.
+
+**Local development:**
+
+```bash
+# Install the Encore CLI (once)
+curl -L https://encore.dev/install.sh | bash   # Linux/macOS
+# or: iwr https://encore.dev/install.ps1 | iex  # Windows PowerShell
+
+cd encore-backend
+npm install
+encore run   # serves on http://localhost:4000
+```
+
+Then set `VITE_WS_URL=ws://localhost:4000/connect` in a `.env.local` file in the project root so the frontend connects to the local Encore server.
+
+**Cloud deployment (Encore Cloud):**
+
+```bash
+cd encore-backend
+encore app create   # link or register the app once
+git push encore main   # deploys to Encore Cloud
+```
+
+After deploying, Encore gives you a URL like `https://staging-cosmic-shooter-XXXX.encr.app`. Set:
+```
+VITE_WS_URL = wss://staging-cosmic-shooter-XXXX.encr.app/connect
+```
+in your Vercel environment variables and redeploy the frontend.
+
+### Game Server — Railway / Render / Fly.io
+
+The original `server.ts` (Express + `ws`) can also run as a **persistent Node.js process** on:
+
+- [Railway](https://railway.app) — connect your repo, set the start command to `npx tsx server.ts`, expose port 3000.
+- [Render](https://render.com) — create a *Web Service*, set the start command to `npx tsx server.ts`.
+- [Fly.io](https://fly.io) — `fly launch` and deploy with port 3000.
+
+> **Why separate?** Vercel is a serverless edge platform; it cannot keep a WebSocket server alive between requests. The game server needs a permanent process to maintain player state and broadcast at 20 Hz.
+
 ## Tech Stack
 
 - **React 19** + **TypeScript**

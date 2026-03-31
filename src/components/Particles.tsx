@@ -49,7 +49,9 @@ export function Particles({ mousePosRef, playerPosRef }: { mousePosRef: React.Mu
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
     context.fillStyle = gradient;
     context.fillRect(0, 0, 64, 64);
-    return new THREE.CanvasTexture(canvas);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
   }, []);
 
   // Initialize instanceColor attribute
@@ -325,7 +327,7 @@ export function Particles({ mousePosRef, playerPosRef }: { mousePosRef: React.Mu
       // Update instanced mesh matrix
       dummy.position.copy(p.position);
       const speed = p.velocity.length();
-      const scale = lifeRatio * (p.isBullet ? 0.15 : 0.08);
+      const scale = lifeRatio * (p.isBullet ? 0.3 : 0.16);
       // Stretch particles based on speed for "motion blur" effect
       const stretch = Math.min(6, Math.max(1, speed * 0.15));
       dummy.scale.set(scale, scale, scale * stretch);
@@ -355,9 +357,10 @@ export function Particles({ mousePosRef, playerPosRef }: { mousePosRef: React.Mu
       <meshBasicMaterial 
         map={particleTexture}
         transparent 
-        opacity={0.8} 
+        opacity={1}
         blending={THREE.AdditiveBlending}
         depthWrite={false}
+        toneMapped={false}
       />
     </instancedMesh>
   );

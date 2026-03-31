@@ -28,10 +28,22 @@ export default function App() {
   const setScatterMultiplier = useGameStore((state) => state.setScatterMultiplier);
   const health = useGameStore((state) => state.health);
   const score = useGameStore((state) => state.score);
+  const damageFlash = useGameStore((state) => state.damageFlash);
+  const invulnerable = useGameStore((state) => state.invulnerable);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white font-sans">
       <CosmicCanvas />
+      
+      {/* Damage Flash Overlay */}
+      {damageFlash && (
+        <div className="absolute inset-0 bg-red-600/30 pointer-events-none z-20 animate-pulse" />
+      )}
+
+      {/* Invulnerability Indicator */}
+      {invulnerable && (
+        <div className="absolute inset-0 border-4 border-cyan-400/40 pointer-events-none z-20 rounded-lg animate-pulse" />
+      )}
       
       {/* UI Overlay */}
       <div className="absolute top-0 left-0 w-full p-6 pointer-events-none flex justify-between items-start z-10">

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -12,6 +12,8 @@ import { useGameStore } from '../store/useGameStore';
 import { Particles } from './Particles';
 import { ForceFields } from './ForceFields';
 import { OtherPlayers, LocalCursor } from './OtherPlayers';
+
+const ARENA_HALF_SIZE = 25;
 
 /**
  * Handles user input and updates the game state.
@@ -50,6 +52,10 @@ function SceneInteraction({ mousePosRef, playerPosRef }: { mousePosRef: React.Mu
     if (keys.current['KeyS']) playerPosRef.current.y -= speed;
     if (keys.current['KeyA']) playerPosRef.current.x -= speed;
     if (keys.current['KeyD']) playerPosRef.current.x += speed;
+
+    // Clamp to arena boundaries
+    playerPosRef.current.x = Math.max(-ARENA_HALF_SIZE, Math.min(ARENA_HALF_SIZE, playerPosRef.current.x));
+    playerPosRef.current.y = Math.max(-ARENA_HALF_SIZE, Math.min(ARENA_HALF_SIZE, playerPosRef.current.y));
 
     // Update store with player position and charging state
     // We send the mouse position as the "targetPosition" for aiming
@@ -150,6 +156,31 @@ function RotatingStars() {
 }
 
 /**
+ * Renders a visible arena boundary.
+ */
+function ArenaBoundary() {
+  const meshRef = useRef<THREE.LineLoop>(null);
+
+  const geometry = useMemo(() => {
+    const s = ARENA_HALF_SIZE;
+    const points = [
+      new THREE.Vector3(-s, -s, 0),
+      new THREE.Vector3(s, -s, 0),
+      new THREE.Vector3(s, s, 0),
+      new THREE.Vector3(-s, s, 0),
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    return geo;
+  }, []);
+
+  return (
+    <lineLoop ref={meshRef} geometry={geometry}>
+      <lineBasicMaterial color="#1a1a3a" />
+    </lineLoop>
+  );
+}
+
+/**
  * Main Game Scene Component.
  * Sets up the Canvas, Lights, Post-processing, and Game Objects.
  */
@@ -172,6 +203,7 @@ export function CosmicCanvas() {
         <ForceFields />
         <OtherPlayers />
         <LocalCursor playerPosRef={playerPosRef} />
+        <ArenaBoundary />
         
         {/* Logic Controller */}
         <SceneInteraction mousePosRef={mousePosRef} playerPosRef={playerPosRef} />

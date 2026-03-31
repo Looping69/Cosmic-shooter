@@ -6,6 +6,12 @@
 import { create } from 'zustand';
 import { soundManager } from '../systems/SoundManager';
 
+// --- Gameplay Constants ---
+const ACCELERATOR_COOLDOWN_MS = 1000;
+const DAMAGE_FLASH_DURATION_MS = 150;
+const INVULNERABILITY_DURATION_MS = 2000;
+const RESPAWN_DELAY_MS = 2000;
+
 // --- Types ---
 export type Vector3 = { x: number; y: number; z: number };
 
@@ -38,6 +44,9 @@ interface GameState {
   health: number;
   score: number;
   isCharging: boolean;
+  invulnerable: boolean;
+  lastAcceleratorTime: number;
+  damageFlash: boolean;
   
   // World state
   players: Record<string, Player>;
@@ -75,6 +84,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   health: 100,
   score: 0,
   isCharging: false,
+  invulnerable: false,
+  lastAcceleratorTime: 0,
+  damageFlash: false,
   onFire: null,
 
   // Connects to the WebSocket server
@@ -202,11 +214,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Requests creation of a force field
   addForce: (position: Vector3, type: 'attractor' | 'repulsor' | 'accelerator') => {
-    const { ws, myColor } = get();
+    const { ws, myColor, lastAcceleratorTime } = get();
+    // 1-second cooldown on accelerators
+    if (type === 'accelerator' && Date.now() - lastAcceleratorTime < ACCELERATOR_COOLDOWN_MS) return;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'add_force', position, forceType: type, color: myColor }));
     }
-    // Optimistic sound (or wait for server? Optimistic feels better)
+    if (type === 'accelerator') set({ lastAcceleratorTime: Date.now() });
     soundManager.playForceField();
   },
 
@@ -215,9 +229,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Handles taking damage locally and notifying server
   takeDamage: (amount: number, attackerId: string) => {
-    const { health, ws, myId } = get();
+    const { health, ws, myId, invulnerable } = get();
+    if (invulnerable) return;
     const newHealth = Math.max(0, health - amount);
-    set({ health: newHealth });
+    set({ health: newHealth, damageFlash: true });
+    setTimeout(() => set({ damageFlash: false }), DAMAGE_FLASH_DURATION_MS);
     
     soundManager.playHit();
     
@@ -229,12 +245,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (newHealth <= 0) {
       soundManager.playDeath();
       setTimeout(() => {
-        set({ health: 100 });
+        set({ health: 100, invulnerable: true });
         soundManager.playSpawn();
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'respawn' }));
         }
-      }, 2000);
+        setTimeout(() => set({ invulnerable: false }), INVULNERABILITY_DURATION_MS);
+      }, RESPAWN_DELAY_MS);
     }
   },
 

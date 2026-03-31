@@ -13,6 +13,7 @@ import { Particles } from './Particles';
 import { ForceFields } from './ForceFields';
 import { OtherPlayers, LocalCursor } from './OtherPlayers';
 
+// Half the arena size — creates a 50×50 total play area
 const ARENA_HALF_SIZE = 25;
 
 /**

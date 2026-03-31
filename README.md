@@ -36,6 +36,29 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Deployment
+
+The project has two parts: a static **frontend** (React/Vite) and a persistent **WebSocket game server** (Express + `ws`). They can be hosted separately.
+
+### Frontend — Vercel (or any static host)
+
+1. Deploy this repository to [Vercel](https://vercel.com). The included `vercel.json` handles SPA routing automatically.
+2. In your Vercel project settings → **Environment Variables**, add:
+   ```
+   VITE_WS_URL = wss://<your-game-server-domain>
+   ```
+3. Redeploy so the frontend is built with the new variable.
+
+### Game Server — Railway / Render / Fly.io
+
+The game server must run as a **persistent Node.js process** (not a serverless function). Platforms that work out of the box:
+
+- [Railway](https://railway.app) — connect your repo, set the start command to `npm run dev` (or `npx tsx server.ts`), expose port 3000.
+- [Render](https://render.com) — create a *Web Service*, set the start command to `npx tsx server.ts`.
+- [Fly.io](https://fly.io) — `fly launch` and deploy with port 3000.
+
+> **Why separate?** Vercel is a serverless edge platform; it cannot keep a WebSocket server alive between requests. The game server needs a permanent process to maintain player state and broadcast at 20 Hz.
+
 ## Tech Stack
 
 - **React 19** + **TypeScript**

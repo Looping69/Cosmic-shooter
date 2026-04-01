@@ -103,9 +103,13 @@ export default function App() {
         <div className="flex flex-col items-end gap-4 pointer-events-auto">
           <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
             <Users size={16} className="text-cyan-400" />
-            <span className="text-sm font-medium">{playerCount} {playerCount === 1 ? 'Player' : 'Players'}</span>
+            <span className="text-sm font-medium">
+              {connectionStatus === 'offline'
+                ? 'Offline Mode'
+                : `${playerCount} ${playerCount === 1 ? 'Player' : 'Players'}`}
+            </span>
           </div>
-          {connectionStatus !== 'connected' && (
+          {connectionStatus !== 'connected' && connectionStatus !== 'offline' && (
             <div className={`flex items-center gap-2 backdrop-blur-md px-4 py-2 rounded-full border shadow-lg ${
               connectionStatus === 'connecting'
                 ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300'

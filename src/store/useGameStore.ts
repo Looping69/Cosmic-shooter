@@ -13,6 +13,13 @@ const INVULNERABILITY_DURATION_MS = 2000;
 const RESPAWN_DELAY_MS = 2000;
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Colors assigned to the local player when entering offline mode
+const OFFLINE_COLORS = [
+  '#FF3366', '#33CCFF', '#FF9933', '#33FF99',
+  '#CC33FF', '#FFFF33', '#FF3333', '#3333FF'
+];
 
 // --- Types ---
 export type Vector3 = { x: number; y: number; z: number };
@@ -56,7 +63,7 @@ interface GameState {
   
   // System state
   ws: WebSocket | null;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected';
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'offline';
   maxParticles: number;
   scatterMultiplier: number;
   
@@ -98,8 +105,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Connects to the WebSocket server
   connect: () => {
-    const { ws: currentWs } = get();
+    const { ws: currentWs, connectionStatus } = get();
     if (currentWs && (currentWs.readyState === WebSocket.CONNECTING || currentWs.readyState === WebSocket.OPEN)) {
+      return;
+    }
+    // Don't auto-reconnect once we've entered offline mode
+    if (connectionStatus === 'offline') {
       return;
     }
 
@@ -208,11 +219,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
 
     ws.onclose = () => {
-      // Auto-reconnect with exponential backoff
+      // Auto-reconnect with exponential backoff, up to MAX_RECONNECT_ATTEMPTS
       const { ws: currentWs } = get();
-      set({ connectionStatus: 'disconnected' });
       if (currentWs === ws) {
         reconnectAttempts++;
+        if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+          // Give up and enter offline / single-player mode
+          const offlineId = 'local-' + Math.random().toString(36).slice(2, 10);
+          const offlineColor = OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)];
+          set({
+            ws: null,
+            connectionStatus: 'offline',
+            myId: offlineId,
+            myColor: offlineColor,
+            health: 100,
+            score: 0,
+          });
+          return;
+        }
+        set({ connectionStatus: 'disconnected' });
         const delay = Math.min(
           RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
           RECONNECT_MAX_DELAY_MS

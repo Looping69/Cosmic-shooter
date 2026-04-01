@@ -11,6 +11,8 @@ const ACCELERATOR_COOLDOWN_MS = 1000;
 const DAMAGE_FLASH_DURATION_MS = 150;
 const INVULNERABILITY_DURATION_MS = 2000;
 const RESPAWN_DELAY_MS = 2000;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
 
 // --- Types ---
 export type Vector3 = { x: number; y: number; z: number };
@@ -54,6 +56,7 @@ interface GameState {
   
   // System state
   ws: WebSocket | null;
+  connectionStatus: 'disconnected' | 'connecting' | 'connected';
   maxParticles: number;
   scatterMultiplier: number;
   
@@ -72,6 +75,9 @@ interface GameState {
   setOnFire: (cb: (data: any) => void) => void;
 }
 
+// Tracks reconnection attempts for exponential backoff
+let reconnectAttempts = 0;
+
 // --- Zustand Store Implementation ---
 export const useGameStore = create<GameState>((set, get) => ({
   myId: null,
@@ -79,6 +85,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: {},
   forceFields: {},
   ws: null,
+  connectionStatus: 'disconnected',
   maxParticles: 25000,
   scatterMultiplier: 1.0,
   health: 100,
@@ -100,12 +107,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     // VITE_WS_URL can be set at build time to point at a separately-hosted
     // WebSocket server (e.g. when the frontend is deployed to Vercel but the
     // game server runs on Railway/Render/Fly.io).
-    // Falls back to same-host connection for local development.
+    // Falls back to same-host /ws endpoint for local development.
     const wsUrl = import.meta.env.VITE_WS_URL || (() => {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          return `${protocol}//${window.location.host}`;
+          return `${protocol}//${window.location.host}/ws`;
         })();
     const ws = new WebSocket(wsUrl);
+
+    set({ connectionStatus: 'connecting' });
+
+    ws.onopen = () => {
+      set({ connectionStatus: 'connected' });
+      // Reset reconnect delay on successful connection
+      reconnectAttempts = 0;
+    };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -187,11 +202,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     };
 
+    ws.onerror = () => {
+      // Error details are intentionally limited in browser WebSocket API.
+      // The onclose handler will fire next and handle reconnection.
+    };
+
     ws.onclose = () => {
-      // Auto-reconnect logic
+      // Auto-reconnect with exponential backoff
       const { ws: currentWs } = get();
+      set({ connectionStatus: 'disconnected' });
       if (currentWs === ws) {
-        setTimeout(() => get().connect(), 1000);
+        reconnectAttempts++;
+        const delay = Math.min(
+          RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+          RECONNECT_MAX_DELAY_MS
+        );
+        setTimeout(() => get().connect(), delay);
       }
     };
 
@@ -202,7 +228,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { ws } = get();
     if (ws) {
       ws.close();
-      set({ ws: null, players: {}, forceFields: {} });
+      set({ ws: null, connectionStatus: 'disconnected', players: {}, forceFields: {} });
     }
   },
 

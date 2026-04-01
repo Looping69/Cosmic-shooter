@@ -85,6 +85,18 @@ interface GameState {
 // Tracks reconnection attempts for exponential backoff
 let reconnectAttempts = 0;
 
+/** Generates the Zustand state patch for entering offline / single-player mode. */
+function offlineState() {
+  return {
+    ws: null as WebSocket | null,
+    connectionStatus: 'offline' as const,
+    myId: 'local-' + crypto.randomUUID(),
+    myColor: OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)],
+    health: 100,
+    score: 0,
+  };
+}
+
 // --- Zustand Store Implementation ---
 export const useGameStore = create<GameState>((set, get) => ({
   myId: null,
@@ -125,16 +137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // serve WebSockets.  Enter offline mode immediately instead of retrying.
     const explicitWsUrl = import.meta.env.VITE_WS_URL;
     if (!explicitWsUrl && import.meta.env.PROD) {
-      const offlineId = 'local-' + crypto.randomUUID();
-      const offlineColor = OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)];
-      set({
-        ws: null,
-        connectionStatus: 'offline',
-        myId: offlineId,
-        myColor: offlineColor,
-        health: 100,
-        score: 0,
-      });
+      set(offlineState());
       return;
     }
 
@@ -244,16 +247,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         reconnectAttempts++;
         if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
           // Give up and enter offline / single-player mode
-          const offlineId = 'local-' + crypto.randomUUID();
-          const offlineColor = OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)];
-          set({
-            ws: null,
-            connectionStatus: 'offline',
-            myId: offlineId,
-            myColor: offlineColor,
-            health: 100,
-            score: 0,
-          });
+          set(offlineState());
           return;
         }
         set({ connectionStatus: 'disconnected' });

@@ -117,9 +117,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Determine the WebSocket URL.
     // VITE_WS_URL can be set at build time to point at a separately-hosted
     // WebSocket server (e.g. when the frontend is deployed to Vercel but the
-    // game server runs on Railway/Render/Fly.io).
+    // game server runs on Encore Cloud / Railway / Render / Fly.io).
     // Falls back to same-host /ws endpoint for local development.
-    const wsUrl = import.meta.env.VITE_WS_URL || (() => {
+    //
+    // In production builds (e.g. on Vercel), if VITE_WS_URL is not set there
+    // is no WebSocket server to connect to — Vercel is serverless and cannot
+    // serve WebSockets.  Enter offline mode immediately instead of retrying.
+    const explicitWsUrl = import.meta.env.VITE_WS_URL;
+    if (!explicitWsUrl && import.meta.env.PROD) {
+      const offlineId = 'local-' + crypto.randomUUID();
+      const offlineColor = OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)];
+      set({
+        ws: null,
+        connectionStatus: 'offline',
+        myId: offlineId,
+        myColor: offlineColor,
+        health: 100,
+        score: 0,
+      });
+      return;
+    }
+
+    const wsUrl = explicitWsUrl || (() => {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           return `${protocol}//${window.location.host}/ws`;
         })();

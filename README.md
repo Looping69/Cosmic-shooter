@@ -69,11 +69,28 @@ Then set `VITE_WS_URL=ws://localhost:4000/connect` in a `.env.local` file in the
 
 **Cloud deployment (Encore Cloud):**
 
+Because the Encore app lives in the `encore-backend/` subdirectory (not the repo root), choose **one** of these approaches:
+
+**Option A — GitHub integration (recommended):**
+
+1. Create an app on [Encore Cloud](https://app.encore.dev) and connect it to this GitHub repo.
+2. In the Encore Cloud app settings, set **Root Directory** to `encore-backend`.
+3. Every push to this repo will auto-deploy the backend.
+
+**Option B — CLI deploy via subtree push:**
+
 ```bash
+# First time: create the Encore Cloud app and note the app ID
 cd encore-backend
-encore app create   # link or register the app once
-git push encore main   # deploys to Encore Cloud
+encore app create          # creates the app and writes .encore/ metadata
+cd ..
+
+# Push only the encore-backend directory to Encore's git remote
+git subtree push --prefix=encore-backend encore main
 ```
+
+> **Note:** `encore-backend/` is a subdirectory, so a plain `git push encore main` from
+> inside it will **not** work. Use `git subtree push` from the repo root instead.
 
 After deploying, Encore gives you a URL like `https://staging-cosmic-shooter-XXXX.encr.app`. Set:
 ```

@@ -137,6 +137,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     // serve WebSockets.  Enter offline mode immediately instead of retrying.
     const explicitWsUrl = import.meta.env.VITE_WS_URL;
     if (!explicitWsUrl && import.meta.env.PROD) {
+      console.info(
+        '[Cosmic Striker] No VITE_WS_URL configured — starting in offline / single-player mode.\n' +
+        'To enable multiplayer, set the VITE_WS_URL environment variable to your game server\'s WebSocket URL\n' +
+        '(e.g. wss://staging-cosmic-shooter-XXXX.encr.app/connect) and redeploy.'
+      );
       set(offlineState());
       return;
     }
@@ -247,6 +252,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         reconnectAttempts++;
         if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
           // Give up and enter offline / single-player mode
+          console.warn(
+            `[Cosmic Striker] WebSocket connection failed after ${MAX_RECONNECT_ATTEMPTS} attempts — entering offline mode.`
+          );
           set(offlineState());
           return;
         }

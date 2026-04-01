@@ -69,8 +69,19 @@ async function startServer() {
   const server = http.createServer(app);
   
   // --- WebSocket Server Setup ---
-  // Attaches to the same HTTP server as Express
-  const wss = new WebSocketServer({ server });
+  // Use noServer mode so the game WebSocket only handles upgrades to /ws,
+  // leaving other upgrade requests (e.g. Vite HMR) untouched.
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    const { pathname } = new URL(request.url || '/', `http://${request.headers.host}`);
+    if (pathname === '/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+    // Other upgrade requests (e.g. Vite HMR) are left for their own handlers.
+  });
 
   wss.on('connection', (ws) => {
     // Initialize new player

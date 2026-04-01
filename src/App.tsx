@@ -13,6 +13,7 @@ export default function App() {
   const disconnect = useGameStore((state) => state.disconnect);
   const players = useGameStore((state) => state.players);
   const myColor = useGameStore((state) => state.myColor);
+  const connectionStatus = useGameStore((state) => state.connectionStatus);
 
   useEffect(() => {
     connect();
@@ -102,8 +103,34 @@ export default function App() {
         <div className="flex flex-col items-end gap-4 pointer-events-auto">
           <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
             <Users size={16} className="text-cyan-400" />
-            <span className="text-sm font-medium">{playerCount} {playerCount === 1 ? 'Player' : 'Players'}</span>
+            <span className="text-sm font-medium">
+              {connectionStatus === 'offline'
+                ? 'Single Player'
+                : `${playerCount} ${playerCount === 1 ? 'Player' : 'Players'}`}
+            </span>
           </div>
+          {connectionStatus === 'offline' && (
+            <div className="flex items-center gap-2 backdrop-blur-md px-4 py-2 rounded-full border shadow-lg bg-orange-500/20 border-orange-400/30 text-orange-200">
+              <div className="w-2 h-2 rounded-full bg-orange-400" />
+              <span className="text-xs font-bold uppercase tracking-widest">
+                No server — offline mode
+              </span>
+            </div>
+          )}
+          {connectionStatus !== 'connected' && connectionStatus !== 'offline' && (
+            <div className={`flex items-center gap-2 backdrop-blur-md px-4 py-2 rounded-full border shadow-lg ${
+              connectionStatus === 'connecting'
+                ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300'
+                : 'bg-red-500/20 border-red-400/30 text-red-300'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+              }`} />
+              <span className="text-xs font-bold uppercase tracking-widest">
+                {connectionStatus === 'connecting' ? 'Connecting…' : 'Disconnected'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

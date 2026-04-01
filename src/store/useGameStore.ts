@@ -11,6 +11,15 @@ const ACCELERATOR_COOLDOWN_MS = 1000;
 const DAMAGE_FLASH_DURATION_MS = 150;
 const INVULNERABILITY_DURATION_MS = 2000;
 const RESPAWN_DELAY_MS = 2000;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Colors assigned to the local player when entering offline mode
+const OFFLINE_COLORS = [
+  '#FF3366', '#33CCFF', '#FF9933', '#33FF99',
+  '#CC33FF', '#FFFF33', '#FF3333', '#3333FF'
+];
 
 // --- Types ---
 export type Vector3 = { x: number; y: number; z: number };
@@ -54,6 +63,7 @@ interface GameState {
   
   // System state
   ws: WebSocket | null;
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'offline';
   maxParticles: number;
   scatterMultiplier: number;
   
@@ -72,6 +82,21 @@ interface GameState {
   setOnFire: (cb: (data: any) => void) => void;
 }
 
+// Tracks reconnection attempts for exponential backoff
+let reconnectAttempts = 0;
+
+/** Generates the Zustand state patch for entering offline / single-player mode. */
+function offlineState() {
+  return {
+    ws: null as WebSocket | null,
+    connectionStatus: 'offline' as const,
+    myId: 'local-' + crypto.randomUUID(),
+    myColor: OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)],
+    health: 100,
+    score: 0,
+  };
+}
+
 // --- Zustand Store Implementation ---
 export const useGameStore = create<GameState>((set, get) => ({
   myId: null,
@@ -79,6 +104,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: {},
   forceFields: {},
   ws: null,
+  connectionStatus: 'disconnected',
   maxParticles: 25000,
   scatterMultiplier: 1.0,
   health: 100,
@@ -91,21 +117,48 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Connects to the WebSocket server
   connect: () => {
-    const { ws: currentWs } = get();
+    const { ws: currentWs, connectionStatus } = get();
     if (currentWs && (currentWs.readyState === WebSocket.CONNECTING || currentWs.readyState === WebSocket.OPEN)) {
+      return;
+    }
+    // Don't auto-reconnect once we've entered offline mode
+    if (connectionStatus === 'offline') {
       return;
     }
 
     // Determine the WebSocket URL.
     // VITE_WS_URL can be set at build time to point at a separately-hosted
     // WebSocket server (e.g. when the frontend is deployed to Vercel but the
-    // game server runs on Railway/Render/Fly.io).
-    // Falls back to same-host connection for local development.
-    const wsUrl = import.meta.env.VITE_WS_URL || (() => {
+    // game server runs on Encore Cloud / Railway / Render / Fly.io).
+    // Falls back to same-host /ws endpoint for local development.
+    //
+    // In production builds (e.g. on Vercel), if VITE_WS_URL is not set there
+    // is no WebSocket server to connect to — Vercel is serverless and cannot
+    // serve WebSockets.  Enter offline mode immediately instead of retrying.
+    const explicitWsUrl = import.meta.env.VITE_WS_URL;
+    if (!explicitWsUrl && import.meta.env.PROD) {
+      console.info(
+        '[Cosmic Striker] No VITE_WS_URL configured — starting in offline / single-player mode.\n' +
+        'To enable multiplayer, set the VITE_WS_URL environment variable to your game server\'s WebSocket URL\n' +
+        '(e.g. wss://staging-cosmic-shooter-XXXX.encr.app/connect) and redeploy.'
+      );
+      set(offlineState());
+      return;
+    }
+
+    const wsUrl = explicitWsUrl || (() => {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          return `${protocol}//${window.location.host}`;
+          return `${protocol}//${window.location.host}/ws`;
         })();
     const ws = new WebSocket(wsUrl);
+
+    set({ connectionStatus: 'connecting' });
+
+    ws.onopen = () => {
+      set({ connectionStatus: 'connected' });
+      // Reset reconnect delay on successful connection
+      reconnectAttempts = 0;
+    };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -187,11 +240,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     };
 
+    ws.onerror = () => {
+      // Error details are intentionally limited in browser WebSocket API.
+      // The onclose handler will fire next and handle reconnection.
+    };
+
     ws.onclose = () => {
-      // Auto-reconnect logic
+      // Auto-reconnect with exponential backoff, up to MAX_RECONNECT_ATTEMPTS
       const { ws: currentWs } = get();
       if (currentWs === ws) {
-        setTimeout(() => get().connect(), 1000);
+        reconnectAttempts++;
+        if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+          // Give up and enter offline / single-player mode
+          console.warn(
+            `[Cosmic Striker] WebSocket connection failed after ${MAX_RECONNECT_ATTEMPTS} attempts — entering offline mode.`
+          );
+          set(offlineState());
+          return;
+        }
+        set({ connectionStatus: 'disconnected' });
+        const delay = Math.min(
+          RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+          RECONNECT_MAX_DELAY_MS
+        );
+        setTimeout(() => get().connect(), delay);
       }
     };
 
@@ -202,7 +274,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { ws } = get();
     if (ws) {
       ws.close();
-      set({ ws: null, players: {}, forceFields: {} });
+      set({ ws: null, connectionStatus: 'disconnected', players: {}, forceFields: {} });
     }
   },
 

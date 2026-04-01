@@ -225,7 +225,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         reconnectAttempts++;
         if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
           // Give up and enter offline / single-player mode
-          const offlineId = 'local-' + Math.random().toString(36).slice(2, 10);
+          const offlineId = 'local-' + crypto.randomUUID();
           const offlineColor = OFFLINE_COLORS[Math.floor(Math.random() * OFFLINE_COLORS.length)];
           set({
             ws: null,
